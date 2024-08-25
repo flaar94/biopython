@@ -246,7 +246,7 @@ jobs:
   test_windows:
     timeout-minutes: 15
     needs: [style, build, build_wheels]
-    runs-on: windows-2019
+    runs-on: windows-latest
     strategy:
       matrix:
         # TODO - Try Python 3.11 again, was Python 3.11.0 was
