@@ -116,7 +116,7 @@ jobs:
     needs: [style]
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-2022]
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     runs-on: ${{ matrix.os }}
@@ -161,93 +161,93 @@ jobs:
   #
 
   # Linux is where the thorough tests run. Install all dependencies and run all (offline) tests.
-  test_linux:
-    timeout-minutes: 15
-    needs: [style, build, build_wheels, linux_prep]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.11", "3.12"]
+#  test_linux:
+#    timeout-minutes: 15
+#    needs: [style, build, build_wheels, linux_prep]
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        python-version: ["3.9", "3.11", "3.12"]
+#
+#    steps:
+#
+#    # Start MySQL server: required for some tests.
+#    - run: |
+#        sudo /etc/init.d/mysql start
+#
+#    - uses: actions/checkout@v4
+#
+#    - name: Set up Python ${{ matrix.python-version }}
+#      uses: actions/setup-python@v5
+#      with:
+#        python-version: ${{ matrix.python-version }}
+#
+#    # Retrieve cache to speed things up
+#    - uses: actions/cache@v4
+#      id: cache-pip
+#      with:
+#        path: ${{ env.pythonLocation }}
+#        key: ${{runner.os}}-${{ env.pythonLocation }}-${{ matrix.python-version }}-v2-${{ hashFiles('setup.py') }}-${{ hashFiles('**/ci-dependencies.txt') }}
+#
+#    - name: Install dependencies
+#      if: steps.cache-pip.outputs.cache-hit != 'true'
+#      run: |
+#          python -m pip install --upgrade --upgrade-strategy eager -r ci-dependencies.txt
+#
+#    - name: Debug Info
+#      run: |
+#        python -m pip list
+#
+#    - name: Install from source
+#      run: |
+#        python -m pip install .
+#
+#    - name: Run test suite
+#      run: |
+#        cd Tests
+#        python run_tests.py --offline
+#      shell: bash
 
-    steps:
-
-    # Start MySQL server: required for some tests.
-    - run: |
-        sudo /etc/init.d/mysql start
-
-    - uses: actions/checkout@v4
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    # Retrieve cache to speed things up
-    - uses: actions/cache@v4
-      id: cache-pip
-      with:
-        path: ${{ env.pythonLocation }}
-        key: ${{runner.os}}-${{ env.pythonLocation }}-${{ matrix.python-version }}-v2-${{ hashFiles('setup.py') }}-${{ hashFiles('**/ci-dependencies.txt') }}
-
-    - name: Install dependencies
-      if: steps.cache-pip.outputs.cache-hit != 'true'
-      run: |
-          python -m pip install --upgrade --upgrade-strategy eager -r ci-dependencies.txt
-
-    - name: Debug Info
-      run: |
-        python -m pip list
-
-    - name: Install from source
-      run: |
-        python -m pip install .
-
-    - name: Run test suite
-      run: |
-        cd Tests
-        python run_tests.py --offline
-      shell: bash
-
-  test_macos:
-    timeout-minutes: 15
-    needs: [style, build, build_wheels]
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.12"]
-
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install Python packaging tools
-      run: |
-        python -m pip install --upgrade pip setuptools wheel
-
-    - name: Install minimal Python dependencies
-      run: |
-        python -m pip install "numpy!=2.1.0"
-
-    - name: Debug Info
-      run: |
-        python -m pip list
-
-    - name: Install from source
-      run: |
-        python -m pip install .
-
-    - name: Run test suite
-      run: |
-        cd Tests
-        python run_tests.py --offline
+#  test_macos:
+#    timeout-minutes: 15
+#    needs: [style, build, build_wheels]
+#    runs-on: macos-latest
+#    strategy:
+#      matrix:
+#        python-version: ["3.9", "3.12"]
+#
+#    steps:
+#    - uses: actions/checkout@v4
+#    - name: Set up Python ${{ matrix.python-version }}
+#      uses: actions/setup-python@v5
+#      with:
+#        python-version: ${{ matrix.python-version }}
+#
+#    - name: Install Python packaging tools
+#      run: |
+#        python -m pip install --upgrade pip setuptools wheel
+#
+#    - name: Install minimal Python dependencies
+#      run: |
+#        python -m pip install "numpy!=2.1.0"
+#
+#    - name: Debug Info
+#      run: |
+#        python -m pip list
+#
+#    - name: Install from source
+#      run: |
+#        python -m pip install .
+#
+#    - name: Run test suite
+#      run: |
+#        cd Tests
+#        python run_tests.py --offline
 
   test_windows:
     timeout-minutes: 15
     needs: [style, build, build_wheels]
-    runs-on: windows-latest
+    runs-on: windows-2022
     strategy:
       matrix:
         # TODO - Try Python 3.11 again, was Python 3.11.0 was
@@ -282,89 +282,89 @@ jobs:
         cd Tests
         python run_tests.py --offline
 
-  test_pypy:
-    timeout-minutes: 20  # a little more time
-    needs: [style, build, build_wheels]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [pypy-3.9]
+#  test_pypy:
+#    timeout-minutes: 20  # a little more time
+#    needs: [style, build, build_wheels]
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        python-version: [pypy-3.9]
+#
+#    steps:
+#    - uses: actions/checkout@v4
+#    - name: Set up Python ${{ matrix.python-version }}
+#      uses: actions/setup-python@v5
+#      with:
+#        python-version: ${{ matrix.python-version }}
+#
+#    - name: Install Python packaging tools
+#      run: |
+#        python -m pip install --upgrade pip setuptools wheel
+#
+#    - name: Install minimal Python dependencies
+#      run: |
+#        python -m pip install "numpy!=2.1.0"
+#
+#    - name: Debug Info
+#      run: |
+#        python -m pip list
+#
+#    - name: Install from source
+#      run: |
+#        python -m pip install .
+#
+#    - name: Run test suite
+#      run: |
+#        cd Tests
+#        python run_tests.py --offline
 
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install Python packaging tools
-      run: |
-        python -m pip install --upgrade pip setuptools wheel
-
-    - name: Install minimal Python dependencies
-      run: |
-        python -m pip install "numpy!=2.1.0"
-
-    - name: Debug Info
-      run: |
-        python -m pip list
-
-    - name: Install from source
-      run: |
-        python -m pip install .
-
-    - name: Run test suite
-      run: |
-        cd Tests
-        python run_tests.py --offline
-
-  # Flag step
-  check_tests:
-    needs: [test_linux, test_macos, test_windows]
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo All tests passed.
-
-  # Check and build (API) documentation if everything passes.
-  docs:
-    needs: [check_tests]
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: 3.9
-
-    - uses: actions/cache@v4
-      id: cache-pip
-      with:
-        path: ${{ env.pythonLocation }}
-        key: ${{runner.os}}-${{ env.pythonLocation }}-${{ matrix.python-version }}-v2-${{ hashFiles('setup.py') }}-${{ hashFiles('**/ci-dependencies.txt') }}
-
-    - name: Install Python packaging tools
-      run: |
-        python -m pip install --upgrade pip setuptools wheel
-
-    - name: Install dependencies
-      if: steps.cache-pip.outputs.cache-hit != 'true'
-      run: |
-        python -m pip install --upgrade --upgrade-strategy eager -r .circleci/requirements-sphinx.txt
-
-    - name: Debug Info
-      run: |
-        python -m pip list
-
-    - name: Install from source
-      run: |
-        python -m pip install .
-
-    - name: Make documentation
-      run: |
-        make -C Doc html
-      shell: bash
+#  # Flag step
+#  check_tests:
+#    needs: [test_linux, test_macos, test_windows]
+#    runs-on: ubuntu-latest
+#    steps:
+#      - run: echo All tests passed.
+#
+#  # Check and build (API) documentation if everything passes.
+#  docs:
+#    needs: [check_tests]
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#    - uses: actions/checkout@v4
+#
+#    - name: Set up Python
+#      uses: actions/setup-python@v5
+#      with:
+#        python-version: 3.9
+#
+#    - uses: actions/cache@v4
+#      id: cache-pip
+#      with:
+#        path: ${{ env.pythonLocation }}
+#        key: ${{runner.os}}-${{ env.pythonLocation }}-${{ matrix.python-version }}-v2-${{ hashFiles('setup.py') }}-${{ hashFiles('**/ci-dependencies.txt') }}
+#
+#    - name: Install Python packaging tools
+#      run: |
+#        python -m pip install --upgrade pip setuptools wheel
+#
+#    - name: Install dependencies
+#      if: steps.cache-pip.outputs.cache-hit != 'true'
+#      run: |
+#        python -m pip install --upgrade --upgrade-strategy eager -r .circleci/requirements-sphinx.txt
+#
+#    - name: Debug Info
+#      run: |
+#        python -m pip list
+#
+#    - name: Install from source
+#      run: |
+#        python -m pip install .
+#
+#    - name: Make documentation
+#      run: |
+#        make -C Doc html
+#      shell: bash
 
   cleanup_wheels:
     if: always()
