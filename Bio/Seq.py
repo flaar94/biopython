@@ -2038,6 +2038,7 @@ class Seq(_SeqAbstractBaseClass):
     not applicable to protein sequences).
     """
 
+    __slots__ = ()
     _data: Union[bytes, SequenceDataAbstractBaseClass]
 
     def __init__(
@@ -2200,6 +2201,8 @@ class MutableSeq(_SeqAbstractBaseClass):
     Note that the MutableSeq object does not support as many string-like
     or biological methods as the Seq object.
     """
+
+    __slots__ = ()
 
     def __init__(self, data):
         """Create a MutableSeq object."""
