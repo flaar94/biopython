@@ -17,14 +17,15 @@ import warnings
 from io import StringIO
 from typing import Any
 from typing import cast
-from collections.abc import Iterable
+from collections.abc import Iterator
 from collections.abc import Mapping
 from typing import NoReturn
 from typing import Optional
 from typing import overload
-from collections.abc import Sequence
+from collections.abc import Sequence, MutableMapping
 from typing import TYPE_CHECKING
 from typing import Union
+import copy
 
 from Bio import BiopythonDeprecationWarning
 from Bio import StreamModeError
@@ -189,7 +190,7 @@ class SeqRecord:
         dbxrefs: Optional[list[str]] = None,
         features: Optional[list["SeqFeature"]] = None,
         annotations: Optional[_AnnotationsDict] = None,
-        letter_annotations: Optional[dict[str, Sequence[Any]]] = None,
+        letter_annotations: Optional[MutableMapping[str, Sequence[Any]]] = None,
     ) -> None:
         """Create a SeqRecord.
 
@@ -280,24 +281,9 @@ class SeqRecord:
             )
         self.features = features
 
-    # TODO - Just make this a read only property?
-    def _set_per_letter_annotations(self, value: Mapping[str, str]) -> None:
-        if not isinstance(value, dict):
-            raise TypeError(
-                "The per-letter-annotations should be a (restricted) dictionary."
-            )
-        # Turn this into a restricted-dictionary (and check the entries)
-        try:
-            self._per_letter_annotations = _RestrictedDict(length=len(self.seq))
-        except AttributeError:
-            # e.g. seq is None
-            self._per_letter_annotations = _RestrictedDict(length=0)
-        self._per_letter_annotations.update(value)
-
-    letter_annotations = property(
-        fget=lambda self: self._per_letter_annotations,
-        fset=_set_per_letter_annotations,
-        doc="""Dictionary of per-letter-annotation for the sequence.
+    @property
+    def letter_annotations(self) -> MutableMapping[str, Sequence[Any]]:
+        """Dictionary of per-letter-annotation for the sequence.
 
         For example, this can hold quality scores used in FASTQ or QUAL files.
         Consider this example using Bio.SeqIO to read in an example Solexa
@@ -345,10 +331,29 @@ class SeqRecord:
 
         Note that if replacing the record's sequence with a sequence of a
         different length you must first clear the letter_annotations dict.
-        """,
-    )
+        """
+        return self._per_letter_annotations
 
-    def _set_seq(self, value: Union["Seq", "MutableSeq"]) -> None:
+    # TODO - Just make this a read only property?
+    @letter_annotations.setter
+    def letter_annotations(self, value: Mapping[str, Sequence]) -> None:
+        if not isinstance(value, dict):
+            raise TypeError(
+                "The per-letter-annotations should be a (restricted) dictionary."
+            )
+        # Turn this into a restricted-dictionary (and check the entries)
+
+        length = 0 if self.seq is None else len(self.seq)
+        self._per_letter_annotations = _RestrictedDict(length=length)
+        self._per_letter_annotations.update(value)
+
+    @property
+    def seq(self) -> Optional[Union["Seq", "MutableSeq"]]:
+        """The sequence itself, as a Seq or MutableSeq object."""
+        return self._seq
+
+    @seq.setter
+    def seq(self, value: Union["Seq", "MutableSeq"]) -> None:
         # Adding this here for users who are not type-checking their code.
         if not isinstance(value, (Seq, MutableSeq)):
             warnings.warn(
@@ -369,17 +374,8 @@ class SeqRecord:
         else:
             self._seq = value
             # Reset the (empty) letter annotations dict with new length:
-            try:
-                self._per_letter_annotations = _RestrictedDict(length=len(self.seq))
-            except AttributeError:
-                # e.g. seq is None
-                self._per_letter_annotations = _RestrictedDict(length=0)
-
-    seq = property(
-        fget=lambda self: self._seq,
-        fset=_set_seq,
-        doc="The sequence itself, as a Seq or MutableSeq object.",
-    )
+            length = 0 if self.seq is None else len(self.seq)
+            self._per_letter_annotations = _RestrictedDict(length=length)
 
     @overload
     def __getitem__(self, index: int) -> str: ...
@@ -571,7 +567,7 @@ class SeqRecord:
             return answer
         raise ValueError("Invalid index")
 
-    def __iter__(self) -> Iterable[Union["Seq", "MutableSeq"]]:
+    def __iter__(self) -> Iterator[str]:
         """Iterate over the letters in the sequence.
 
         For example, using Bio.SeqIO to read in a protein FASTA file:
@@ -623,7 +619,7 @@ class SeqRecord:
         You may agree that using zip(rec.seq, ...) is more explicit than using
         zip(rec, ...) as shown above.
         """
-        return iter(self.seq)
+        return iter("") if self.seq is None else iter(self.seq)
 
     def __contains__(self, char: str) -> bool:
         """Implement the 'in' keyword, searches the sequence.
@@ -652,10 +648,11 @@ class SeqRecord:
 
         See also the Seq object's __contains__ method.
         """
-        return char in self.seq
+
+        return char in self.seq if self.seq is not None else False
 
     def __bytes__(self) -> bytes:
-        return bytes(self.seq)
+        return bytes(self.seq) if self.seq is not None else b""
 
     def __str__(self) -> str:
         """Return a human readable summary of the record and its annotation (string).
@@ -703,14 +700,18 @@ class SeqRecord:
             lines.append(
                 "Per letter annotation for: " + ", ".join(self.letter_annotations)
             )
-        try:
-            bytes(self.seq)
-        except UndefinedSequenceError:
-            lines.append(f"Undefined sequence of length {len(self.seq)}")
+        if self.seq is not None:
+            try:
+                bytes(self.seq)
+            except UndefinedSequenceError:
+                lines.append(f"Undefined sequence of length {len(self.seq)}")
+            else:
+                # Don't want to include the entire sequence
+                seq = repr(self.seq)
+                lines.append(seq)
         else:
-            # Don't want to include the entire sequence
-            seq = repr(self.seq)
-            lines.append(seq)
+            lines.append("Undefined sequence of length 0")
+
         return "\n".join(lines)
 
     def __repr__(self) -> str:
@@ -834,7 +835,7 @@ class SeqRecord:
         >>> len(record.seq)
         309
         """
-        return len(self.seq)
+        return len(self.seq) if self.seq is not None else 0
 
     def __lt__(self, other: Any) -> NoReturn:
         """Define the less-than operand (not implemented)."""
@@ -947,6 +948,10 @@ class SeqRecord:
         >>> new.annotations = plasmid.annotations.copy()
         >>> new.dbxrefs = plasmid.dbxrefs[:]
         """
+
+        if self.seq is None:
+            raise ValueError("Left operand seq=None, can't add")
+
         if not isinstance(other, SeqRecord):
             # Assume it is a string or a Seq.
             # Note can't transfer any per-letter-annotations
@@ -959,7 +964,11 @@ class SeqRecord:
                 annotations=self.annotations.copy(),
                 dbxrefs=self.dbxrefs[:],
             )
-        # Adding two SeqRecord objects... must merge annotation.
+
+        if other.seq is None:
+            raise ValueError("Right operand seq=None, can't add")
+
+        # Adding two SeqRecord objects... must merge annotation
         answer = type(self)(
             self.seq + other.seq, features=self.features[:], dbxrefs=self.dbxrefs[:]
         )
@@ -982,9 +991,17 @@ class SeqRecord:
             if k in other.annotations and other.annotations[k] == v:
                 answer.annotations[k] = v
         # Can append matching per-letter-annotation
-        for k, v in self.letter_annotations.items():
-            if k in other.letter_annotations:
-                answer.letter_annotations[k] = v + other.letter_annotations[k]
+        try:
+            # To make this type safe, we would need to make sure the types are compatible, eg: no adding tuples and str
+            answer.letter_annotations = {
+                k: v + other.letter_annotations[k]  # type: ignore
+                for k, v in self.letter_annotations.items()
+                if k in other.letter_annotations
+            }
+        except TypeError:
+            print("Failed while try to concatenate letter annotations")
+            raise
+
         return answer
 
     def __radd__(self, other: Union["Seq", "MutableSeq", str]) -> "SeqRecord":
@@ -1012,11 +1029,13 @@ class SeqRecord:
                 "This should have happened via the __add__ of "
                 "the other SeqRecord being added!"
             )
+        if self.seq is None:
+            raise TypeError("Can't add (right hand side) SeqRecord with seq = None")
         # Assume it is a string or a Seq.
         # Note can't transfer any per-letter-annotations
         offset = len(other)
         return type(self)(
-            other + self.seq,
+            cast(Union[Seq, MutableSeq], other + self.seq),
             id=self.id,
             name=self.name,
             description=self.description,
@@ -1060,14 +1079,14 @@ class SeqRecord:
         <BLANKLINE>
         """
         return type(self)(
-            self.seq.upper(),
+            self.seq.upper() if self.seq is not None else self.seq,
             id=self.id,
             name=self.name,
             description=self.description,
             dbxrefs=self.dbxrefs[:],
             features=self.features[:],
             annotations=self.annotations.copy(),
-            letter_annotations=self.letter_annotations.copy(),
+            letter_annotations=copy.copy(self.letter_annotations),
         )
 
     def lower(self) -> "SeqRecord":
@@ -1103,14 +1122,14 @@ class SeqRecord:
         True
         """
         return type(self)(
-            self.seq.lower(),
+            self.seq.lower() if self.seq is not None else self.seq,
             id=self.id,
             name=self.name,
             description=self.description,
             dbxrefs=self.dbxrefs[:],
             features=self.features[:],
             annotations=self.annotations.copy(),
-            letter_annotations=self.letter_annotations.copy(),
+            letter_annotations=copy.copy(self.letter_annotations),
         )
 
     def isupper(self):
@@ -1278,8 +1297,11 @@ class SeqRecord:
         >>> print("%s %s" % (rc.id, rc.seq))
         Test ACGA
         """
-        from Bio.Seq import MutableSeq  # Lazy to avoid circular imports
-        from Bio.Seq import Seq  # Lazy to avoid circular imports
+
+        if self.seq is None:
+            raise NotImplementedError(
+                "Seq in SeqRecord is None. reverse_complement hasn't be implemented in this case"
+            )
 
         if "protein" in cast(str, self.annotations.get("molecule_type", "")):
             raise ValueError("Proteins do not have complements!")
@@ -1314,6 +1336,7 @@ class SeqRecord:
             # Copy the old features, adjusting location and string
             length = len(answer)
             answer.features = [f._flip(length) for f in self.features]
+
             # The old list should have been sorted by start location,
             # reversing it will leave it sorted by what is now the end position,
             # so we need to resort in case of overlapping features.
@@ -1405,6 +1428,10 @@ class SeqRecord:
         """
         if "protein" == self.annotations.get("molecule_type", ""):
             raise ValueError("Proteins cannot be translated!")
+
+        if self.seq is None:
+            raise ValueError("Seq in SeqRecord is None, can't be translated")
+
         answer = SeqRecord(
             self.seq.translate(
                 table=table, stop_symbol=stop_symbol, to_stop=to_stop, cds=cds, gap=gap

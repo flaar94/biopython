@@ -368,6 +368,7 @@ from collections.abc import Mapping
 from typing import Optional
 from collections.abc import Sequence
 from typing import Union
+from typing import cast
 
 from Bio import BiopythonParserWarning
 from Bio import BiopythonWarning
@@ -530,14 +531,17 @@ def phred_quality_from_solexa(solexa_quality: float) -> float:
     return 10 * log(10 ** (solexa_quality / 10.0) + 1, 10)
 
 
-def _get_phred_quality(record: SeqRecord) -> Union[list[float], list[int]]:
+def _get_phred_quality(record: SeqRecord) -> Union[list[int], list[float]]:
     """Extract PHRED qualities from a SeqRecord's letter_annotations (PRIVATE).
 
     If there are no PHRED qualities, but there are Solexa qualities, those are
     used instead after conversion.
     """
     try:
-        return record.letter_annotations["phred_quality"]
+        phred_quality = cast(
+            Union[list[int], list[float]], record.letter_annotations["phred_quality"]
+        )
+        return phred_quality
     except KeyError:
         pass
     try:
